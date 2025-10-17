@@ -1,0 +1,189 @@
+
+---
+
+## Template de index.html (colar em `index.html`)
+
+> Página leve, responsiva e acessível para **GitHub Pages**. Usa apenas CSS inline (sem dependências externas).  
+> As âncoras refletem as mesmas secções do README, com exemplos formatados.
+
+```html
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sistemas Operativos — Aula: case & globs (Bash)</title>
+  <meta name="description" content="Aula prática de Sistemas Operativos: estrutura case e globs no Bash, com exemplos, exercícios e cheatsheets.">
+  <style>
+    :root { --w: 980px; }
+    html { box-sizing: border-box; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      line-height: 1.55; color: #111; background: #fafafa;
+    }
+    header {
+      background: #111; color: #fff; padding: 3rem 1rem; text-align: center;
+    }
+    header h1 { margin: 0 0 .5rem; font-size: clamp(1.6rem, 2.8vw, 2.4rem); }
+    header p { margin: 0; opacity: .9; }
+    nav {
+      position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e8e8e8;
+      padding: .5rem 1rem; z-index: 10; overflow-x: auto; white-space: nowrap;
+    }
+    nav a { margin-right: 1rem; text-decoration: none; color: #0366d6; }
+    main { max-width: var(--w); margin: 1.5rem auto; padding: 0 1rem; }
+    section { margin: 2rem 0; }
+    h2 { font-size: 1.4rem; margin: 1.6rem 0 .6rem; }
+    h3 { font-size: 1.1rem; margin: 1.2rem 0 .4rem; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    pre {
+      background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 1rem; overflow-x: auto;
+      box-shadow: 0 1px 0 rgba(0,0,0,.02);
+    }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid #eee; padding: .5rem .6rem; text-align: left; }
+    th { background: #f7f7f7; }
+    .card {
+      background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,.04);
+    }
+    footer {
+      margin-top: 3rem; padding: 2rem 1rem; text-align: center; color: #666;
+    }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+  </style>
+</head>
+<body>
+  <a class="sr-only" href="#conteudo">Saltar para o conteúdo</a>
+
+  <header role="banner">
+    <h1>Sistemas Operativos — Aula: <code>case</code> & <em>globs</em> (Bash)</h1>
+    <p>Decisões múltiplas elegantes com <code>case</code> + seleção de ficheiros com padrões.</p>
+  </header>
+
+  <nav aria-label="Navegação de secções">
+    <a href="#objetivos">Objetivos</a>
+    <a href="#setup">Setup</a>
+    <a href="#resumo">Resumo</a>
+    <a href="#exemplos">Exemplos</a>
+    <a href="#exercicios">Exercícios</a>
+    <a href="#recursos">Recursos</a>
+    <a href="#avaliacao">Avaliação</a>
+  </nav>
+
+  <main id="conteudo" role="main">
+    <section id="objetivos" class="card">
+      <h2>Objetivos de Aprendizagem</h2>
+      <ul>
+        <li>Dominar a sintaxe de <code>case</code> no Bash.</li>
+        <li>Aplicar <em>globs</em> para casar padrões e filtrar ficheiros.</li>
+        <li>Distinguir <em>globbing</em>, <em>brace expansion</em> e <em>extended globbing</em>.</li>
+      </ul>
+    </section>
+
+    <section id="setup">
+      <h2>Setup rápido</h2>
+      <pre><code>git clone https://github.com/&lt;org&gt;/&lt;repo&gt;.git
+cd &lt;repo&gt;
+# (Opcional) instalar shellcheck
+sudo apt-get install -y shellcheck</code></pre>
+    </section>
+
+    <section id="resumo">
+      <h2>Resumo: `case` e *globs*</h2>
+
+      <h3>Sintaxe `case`</h3>
+      <pre><code>case "$var" in
+  padrao1) comando1 ;;
+  padrao2|padrao3) comando2 ;;
+  *.txt) comando_para_txt ;;
+  *) comando_default ;;
+esac</code></pre>
+
+      <h3>*Globs* essenciais</h3>
+      <table>
+        <thead><tr><th>Padrão</th><th>Significado</th><th>Exemplo</th></tr></thead>
+        <tbody>
+          <tr><td><code>*</code></td><td>0+ caracteres</td><td><code>*.txt</code></td></tr>
+          <tr><td><code>?</code></td><td>1 caractere</td><td><code>?.c</code></td></tr>
+          <tr><td><code>[abc]</code></td><td>um de a/b/c</td><td><code>file[12].log</code></td></tr>
+          <tr><td><code>[a-z]</code></td><td>intervalo</td><td><code>data_[a-z].csv</code></td></tr>
+          <tr><td><code>[!0-9]</code></td><td>nega dígitos</td><td><code>file[!0-9].txt</code></td></tr>
+          <tr><td><code>[[:digit:]]</code></td><td>classe POSIX</td><td><code>*[[:digit:]].md</code></td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Nota:</strong> <code>{a,b}</code> é <em>brace expansion</em>, não <em>globbing</em>. Para <em>extended globs</em> use <code>shopt -s extglob</code>.</p>
+    </section>
+
+    <section id="exemplos">
+      <h2>Exemplos</h2>
+
+      <h3>Menu com `case`</h3>
+      <pre><code>#!/usr/bin/env bash
+set -euo pipefail
+PS3="Escolha: "
+select opt in "Listar .txt" "Contar .sh" "Sair"; do
+  case "$REPLY" in
+    1) ls -1 -- *.txt 2>/dev/null || echo "Sem .txt";;
+    2) wc -l -- *.sh  2>/dev/null || echo "Sem .sh";;
+    3) echo "Até já!"; break;;
+    *) echo "Inválido";;
+  esac
+done</code></pre>
+
+      <h3>Validação por padrão</h3>
+      <pre><code>read -rp "Ficheiro: " f
+case "$f" in
+  *.csv) echo "CSV";;
+  *.tsv|*.tab) echo "TSV";;
+  *[[:space:]]*) echo "Aviso: espaços no nome";;
+  *) echo "Desconhecido";;
+esac</code></pre>
+
+      <h3>Extended globs</h3>
+      <pre><code>shopt -s extglob
+case "${1,,}" in
+  @(start|run|go))   echo "Iniciar";;
+  @(stop|halt|end))  echo "Parar";;
+  *)                 echo "Ajuda: start|stop";;
+esac</code></pre>
+    </section>
+
+    <section id="exercicios">
+      <h2>Exercícios</h2>
+      <ol>
+        <li><strong>Filtro por extensão:</strong> listar <code>*.{txt,md}</code> e contar por tipo.</li>
+        <li><strong>Normalizador:</strong> detetar nomes com espaços/maiúsculas e propor renomeação.</li>
+        <li><strong>CLI com case:</strong> aceitar <code>--full</code>, <code>--inc</code>, <code>--help</code>.</li>
+        <li><strong>Validador:</strong> padrões com classes POSIX e <code>case</code>.</li>
+        <li><strong>Relatório:</strong> contagens para <code>*.sh</code>, <code>*test*</code>, <code>*.{png,jpg}</code>.</li>
+      </ol>
+      <p>Enunciados em <code>aulas/01-case-e-globs/enunciados/</code>.</p>
+    </section>
+
+    <section id="recursos" class="card">
+      <h2>Recursos</h2>
+      <ul>
+        <li>Cheatsheet <code>case</code> — <code>aulas/01-case-e-globs/recursos/cheatsheet_case.md</code></li>
+        <li>Cheatsheet *globs* — <code>aulas/01-case-e-globs/recursos/cheatsheet_globs.md</code></li>
+        <li>(Opcional) Testes com <code>bats</code> em <code>tests/</code></li>
+      </ul>
+    </section>
+
+    <section id="avaliacao">
+      <h2>Avaliação &amp; Entrega</h2>
+      <ul>
+        <li><strong>Entrega:</strong> scripts + <code>RELATORIO.md</code> (o quê/como/testes).</li>
+        <li><strong>Rubrica:</strong> funcionalidade 40% • robustez 30% • legibilidade 20% • testes 10%.</li>
+        <li>Use <code>shellcheck</code> e <code>set -euo pipefail</code>.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer role="contentinfo">
+    © 2025 • Aula prática de Sistemas Operativos — <a href="https://github.com">GitHub</a>
+  </footer>
+</body>
+</html>
