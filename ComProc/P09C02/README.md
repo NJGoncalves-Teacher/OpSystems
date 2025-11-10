@@ -62,5 +62,4 @@ Um *pipe* é um conceito de ligação em fluxo entre componentes de software: pe
 ## Implementação
 
 - Um *pipe* e um sentido
-- Um *pipe* e dois sentidos
 - Dois *pipes*
