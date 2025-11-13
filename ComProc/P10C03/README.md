@@ -21,12 +21,12 @@ Na perspetiva da programação em C, a comunicação por meio de ficheiros tempo
 Função POSIX, mais robusta:
 * Protótipo: int mkstemp(char *template);
 *  Recebe uma template do tipo "./tmpfileXXXXXX":
- * Os X são substituídos pelo sistema por caracteres aleatórios, gerando um nome único.
+   * Os X são substituídos pelo sistema por caracteres aleatórios, gerando um nome único.
 * Devolve um descritor de ficheiro aberto para leitura/escrita.
 * É a forma recomendada em Unix para criar ficheiros temporários com um nome.
 
 Fluxo típico:
-1. Declarar uma template:
+1. Declarar uma template:  
    ``` char template[] = "/tmp/meutmpXXXXXX"; ```
 2. Chamar ``` mkstemp(template); ```
 3. Usar o descritor com ``` write/read ``` ou convertê-lo para ``` FILE* ``` com ``` fdopen ```.
@@ -35,7 +35,22 @@ Fluxo típico:
 ## Funções de apoio na leitura/escrita
 
 * **Modo “baixo nível” (POSIX)**:
- * ``` read ```, ``` write ``` (sobre o descritor devolvido por ``` mkstemp ```)
- * ``` lseek ```
- * ``` close ```
- * ``` unlink ``` ou ``` remove ``` para apagar o ficheiro.
+    * ``` read ```, ``` write ``` (sobre o descritor devolvido por ``` mkstemp ```)
+    * ``` lseek ```
+    * ``` close ```
+    * ``` unlink ``` ou ``` remove ``` para apagar o ficheiro.
+
+## Efeito autobloqueante
+Em ficheiros normais no disco, as chamadas read e write não têm o comportamento autoblocante que vês nos pipes: read lê até ao fim-do-ficheiro atual e, se chegar a EOF, devolve 0 sem ficar à espera que outro processo volte a escrever; write escreve o que conseguir (ou falha, por exemplo se o disco estiver cheio), mas não bloqueia à espera que “apareça espaço” como num pipe cheio, e a flag O_NONBLOCK é praticamente ignorada para ficheiros regulares.
+
+## Quando usar ficheiros temporários?
+Cenários típicos:
+* Guardar resultados intermédios de um cálculo que não faz sentido manter a longo prazo.
+* Comunicar dados entre dois programas simples, sem recorrer imediatamente a sockets ou bibliotecas mais complexas.
+* Depurar programas: inspecionar o conteúdo dos ficheiros temporários.
+Limitações a mencionar aos alunos:
+* Comunicação via ficheiro é mais lenta do que via pipes ou sockets (acesso a disco).
+* Não é adequada para comunicação em tempo real ou de baixa latência.
+* É preciso garantir a remoção dos ficheiros para não “poluir” o sistema.
+
+Em resumo, a comunicação através de ficheiros temporários em C consiste em usar o sistema de ficheiros como intermediário: criamos um ficheiro de vida curta, escrevemos nele os dados e outro módulo ou processo os lê. Em C, isto faz-se com funções como tmpfile() ou mkstemp(), combinadas com as funções normais de leitura/escrita de ficheiros. O programador tem de garantir que o ficheiro é apagado quando deixa de ser necessário, para não “poluir” o sistema.
