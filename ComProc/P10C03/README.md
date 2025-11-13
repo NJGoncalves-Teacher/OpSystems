@@ -21,10 +21,21 @@ Na perspetiva da programação em C, a comunicação por meio de ficheiros tempo
 Função POSIX, mais robusta:
 * Protótipo: int mkstemp(char *template);
 *  Recebe uma template do tipo "./tmpfileXXXXXX":
-  * Os X são substituídos pelo sistema por caracteres aleatórios, gerando um nome único.
+ * Os X são substituídos pelo sistema por caracteres aleatórios, gerando um nome único.
 * Devolve um descritor de ficheiro aberto para leitura/escrita.
 * É a forma recomendada em Unix para criar ficheiros temporários com um nome.
 
 Fluxo típico:
 1. Declarar uma template:
-   ~~~char template[] = "/tmp/meutmpXXXXXX";~~~
+   ``` char template[] = "/tmp/meutmpXXXXXX"; ```
+2. Chamar ``` mkstemp(template); ```
+3. Usar o descritor com ``` write/read ``` ou convertê-lo para ``` FILE* ``` com ``` fdopen ```.
+4. No fim, fechar e apagar o ficheiro com ``` close/fclose ``` e ``` remove ``` ou ``` unlink ```.
+
+## Funções de apoio na leitura/escrita
+
+* **Modo “baixo nível” (POSIX)**:
+ * ``` read ```, ``` write ``` (sobre o descritor devolvido por ``` mkstemp ```)
+ * ``` lseek ```
+ * ``` close ```
+ * ``` unlink ``` ou ``` remove ``` para apagar o ficheiro.
