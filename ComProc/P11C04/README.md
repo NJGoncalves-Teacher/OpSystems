@@ -20,17 +20,17 @@ Ao dispensar semáforos e outros mecanismos de sincronização, aceitamos limita
 
 Se quiseres também mencionar a API “clássica” de System V IPC:
 
-1 Cabeçalhos
+1. Cabeçalhos
 
-#include <sys/ipc.h>
-#include <sys/shm.h>
+``` #include <sys/ipc.h> ``` 
+``` #include <sys/shm.h> ``` 
 
-Funções principais
+2. Funções principais
 
-int shmget(key_t key, size_t size, int shmflg); – cria/obtém um segmento de memória partilhada.
-void *shmat(int shmid, const void *shmaddr, int shmflg); – anexa (mapeia) o segmento no espaço de endereços do processo.
-int shmdt(const void *shmaddr); – desanexa o segmento.
-int shmctl(int shmid, int cmd, struct shmid_ds *buf); – controla/consulta/remover o segmento (IPC_RMID, etc.).
+``` int shmget(key_t key, size_t size, int shmflg); ``` – cria/obtém um segmento de memória partilhada.
+``` void *shmat(int shmid, const void *shmaddr, int shmflg); ``` – anexa (mapeia) o segmento no espaço de endereços do processo.
+``` int shmdt(const void *shmaddr); ``` – desanexa o segmento.
+``` int shmctl(int shmid, int cmd, struct shmid_ds *buf); ``` – controla/consulta/remover o segmento (IPC_RMID, etc.).
 
 ## Mensagem final
 
