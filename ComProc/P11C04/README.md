@@ -1,49 +1,37 @@
 # Comunicação entre processos via memória partilhada (POSIX/UNIX)
 
-Este projeto introduce, de forma simples, o conceito de **comunicação entre processos via memória partilhada** em sistemas POSIX/UNIX, **sem recorrer a semáforos** ou outros mecanismos de sincronização avançados. A ideia é perceber o modelo base: vários processos a aceder à mesma região de memória, como se fosse um “quadro branco” comum.
+Quando dois processos precisam de comunicar, é comum pensar em mecanismos como pipes ou sockets, onde as mensagens são trocadas através do sistema operativo. No entanto, há situações em que é mais eficiente partilhar diretamente dados em memória, sobretudo quando o volume de informação é grande ou o acesso tem de ser muito rápido. A memória partilhada surge precisamente como resposta a esta necessidade: permite que vários processos, em sistemas POSIX/UNIX, vejam e manipulem a mesma região de memória, reduzindo cópias e overhead. Nesta introdução, o objetivo não é construir um sistema robusto de produção, mas sim perceber o conceito básico e as suas implicações, sem ainda recorrer a semáforos ou outras primitivas de sincronização.
 
-> ⚠️ Importante: o foco é pedagógico. As soluções apresentadas **não são adequadas para sistemas concorrentes reais**, precisamente por não usarem semáforos/mutexes.
+## Ideia Central
 
----
+Em condições normais, cada processo tem o seu próprio espaço de endereços, isolado dos restantes, o que garante segurança e independência. A memória partilhada é uma exceção controlada a este isolamento: o sistema operativo cria uma região especial de memória e mapeia-a simultaneamente em dois ou mais processos. Cada processo obtém um ponteiro para essa região e passa a poder ler e escrever nela como se se tratasse de memória sua. Na prática, isto funciona como um “quadro branco” comum: tudo o que um processo escreve nessa zona torna-se imediatamente visível aos outros que a partilham. A eficiência resulta do facto de os dados não serem copiados entre processos, mas apenas acedidos diretamente em RAM.
 
-## 1. Enquadramento
+## Exemplo conceptual
 
-Num sistema POSIX/UNIX, cada processo tem, em princípio, o seu próprio espaço de endereços: o que um processo escreve na sua memória não é visível aos outros.
+Um exemplo simples é o padrão produtor–consumidor com um único produtor e um único consumidor. Imagina-se uma pequena estrutura em memória partilhada que funciona como uma “caixa” com um campo de estado e um campo de dados. O produtor só escreve na caixa quando esta está marcada como vazia, coloca aí a mensagem e, no fim, assinala que a caixa está cheia. O consumidor, por sua vez, espera até ver que a caixa está cheia, lê a mensagem e volta a marcar a caixa como vazia. Esta disciplina cria uma alternância de acessos: primeiro escreve o produtor, depois lê o consumidor, e assim sucessivamente. Conceitualmente, isto mostra como dois processos podem coordenar-se apenas com variáveis em memória partilhada, sem recorrer a canais de comunicação adicionais.
 
-A **memória partilhada** é uma exceção controlada: o sistema operativo cria uma região de memória e mapeia-a em dois (ou mais) processos. Cada processo obtém um ponteiro para essa região e passa a poder ler e escrever nela como se fosse memória “normal”.
+## Cuidados (sem semáforos)
 
----
+Ao dispensar semáforos e outros mecanismos de sincronização, aceitamos limitações importantes e temos de ser muito conservadores no desenho do protocolo. Em primeiro lugar, é crucial restringir o cenário: um único produtor e um único consumidor, com regras claras sobre quem escreve e quem lê em cada momento, para reduzir a probabilidade de condições de corrida. Em segundo lugar, a coordenação é frequentemente implementada com espera ativa, em que um processo fica a testar repetidamente um campo de estado até este mudar, o que consome CPU e não é escalável. Em terceiro lugar, a falta de proteção torna o sistema vulnerável a estados inconsistentes: se um processo morrer a meio de uma atualização, o outro pode ficar bloqueado ou ler dados incompletos. Finalmente, é necessário cuidar do layout dos dados (estruturas simples, sem ponteiros para memória privada), das permissões de acesso e da limpeza dos recursos, para evitar fugas de memória partilhada e problemas de segurança.
 
-## 2. Ideia geral da comunicação via memória partilhada
+## Funções a usar
 
-De forma abstrata, a comunicação faz-se em quatro passos:
+### Memória partilhada System V (para referência)
 
-1. **Criação do segmento partilhado**  
-   Um processo (ou mais) pede ao sistema operativo uma região de memória partilhada, identificada por um nome/ID.
+Se quiseres também mencionar a API “clássica” de System V IPC:
 
-2. **Mapeamento nos processos**  
-   Cada processo interessado mapeia essa região no seu espaço de endereços. No final, todos têm um ponteiro para a mesma zona de memória física.
+1 Cabeçalhos
 
-3. **Troca de dados**  
-   Os processos combinam um **protocolo simples**: quem escreve, quem lê, em que ordem, que campos significam o quê. Passam a ler/escrever na memória partilhada como em variáveis normais.
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
-4. **Limpeza**  
-   Quando deixam de precisar, desmapeiam a memória e pedem ao sistema operativo para remover o objeto de memória partilhada, libertando recursos.
+Funções principais
 
-Comparação rápida com outros mecanismos:
+int shmget(key_t key, size_t size, int shmflg); – cria/obtém um segmento de memória partilhada.
+void *shmat(int shmid, const void *shmaddr, int shmflg); – anexa (mapeia) o segmento no espaço de endereços do processo.
+int shmdt(const void *shmaddr); – desanexa o segmento.
+int shmctl(int shmid, int cmd, struct shmid_ds *buf); – controla/consulta/remover o segmento (IPC_RMID, etc.).
 
-- **Mais rápido** do que pipes ou sockets, porque não há cópia explícita de buffers entre kernel e user space a cada comunicação.
-- **Mais perigoso** se não houver disciplina: não há qualquer sincronização automática; os processos podem interferir uns com os outros.
+## Mensagem final
 
----
-
-## 3. Modelo de exemplo: produtor / consumidor
-
-Para uma primeira abordagem (sem semáforos), usa-se muitas vezes o modelo **1 produtor + 1 consumidor**, ambos ligados a uma pequena estrutura em memória partilhada, por exemplo:
-
-```c
-struct caixa {
-    int ready;      // 0 = vazio, 1 = cheio
-    char dados[256];
-};
-
+A comunicação entre processos via memória partilhada oferece grandes vantagens de desempenho, ao permitir que vários processos acedam de forma direta e rápida a dados comuns, como se trabalhassem num mesmo “quadro branco” em RAM. No entanto, essa potência vem acompanhada de riscos: sem mecanismos de sincronização adequados, é fácil cair em condições de corrida, bloqueios ou incoerências de dados. Nesta fase introdutória, o uso de exemplos simples, sem semáforos, é útil para fixar a ideia central e perceber intuitivamente como a memória partilhada funciona. Ao mesmo tempo, estas limitações servem de motivação natural para, mais à frente, introduzir semáforos, mutexes e variáveis de condição, que tornam possível usar memória partilhada de forma segura e robusta em sistemas reais.
