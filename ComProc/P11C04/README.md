@@ -23,15 +23,22 @@ Se quiseres também mencionar a API “clássica” de System V IPC:
 1. Cabeçalhos
 
 ``` #include <sys/ipc.h> ``` 
+
 ``` #include <sys/shm.h> ``` 
 
 2. Funções principais
 
-``` int shmget(key_t key, size_t size, int shmflg); ``` – cria/obtém um segmento de memória partilhada.
-``` void *shmat(int shmid, const void *shmaddr, int shmflg); ``` – anexa (mapeia) o segmento no espaço de endereços do processo.
+``` int shmget(key_t key, size_t size, int shmflg); ``` – cria ou obtém um segmento de memória partilhada.
+
+``` void *shmat(int shmid, const void *shmaddr, int shmflg); ``` – anexa (mapeia) o segmento ao espaço de endereços do processo.
+
 ``` int shmdt(const void *shmaddr); ``` – desanexa o segmento.
+
 ``` int shmctl(int shmid, int cmd, struct shmid_ds *buf); ``` – controla/consulta/remover o segmento (IPC_RMID, etc.).
 
 ## Mensagem final
 
-A comunicação entre processos via memória partilhada oferece grandes vantagens de desempenho, ao permitir que vários processos acedam de forma direta e rápida a dados comuns, como se trabalhassem num mesmo “quadro branco” em RAM. No entanto, essa potência vem acompanhada de riscos: sem mecanismos de sincronização adequados, é fácil cair em condições de corrida, bloqueios ou incoerências de dados. Nesta fase introdutória, o uso de exemplos simples, sem semáforos, é útil para fixar a ideia central e perceber intuitivamente como a memória partilhada funciona. Ao mesmo tempo, estas limitações servem de motivação natural para, mais à frente, introduzir semáforos, mutexes e variáveis de condição, que tornam possível usar memória partilhada de forma segura e robusta em sistemas reais.
+A comunicação entre processos via memória partilhada oferece grandes vantagens de desempenho, ao permitir que vários processos acedam de forma direta e rápida a dados comuns, como se trabalhassem num mesmo “quadro branco” em RAM. No entanto, essa potência vem acompanhada de riscos: sem mecanismos de sincronização adequados, é fácil cair em condições de corrida, bloqueios ou incoerências de dados. Nesta fase introdutória, o uso de exemplos simples, sem semáforos, é útil para fixar a ideia central e perceber intuitivamente como a memória partilhada funciona. Ao mesmo tempo, estas limitações servem de motivação natural para, mais à frente, introduzir semáforos, mutexes e variáveis de condição, que tornam possível o uso de memória partilhada de forma segura e robusta em sistemas reais.
+
+## Nota
+Deve utilizar os comandos ``` ipcs ``` e ``` ipcrm ``` para remover blocos não libertados devido ao funcionamento incorreto dos programas.
