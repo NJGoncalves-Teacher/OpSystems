@@ -42,3 +42,267 @@ A comunicação entre processos via memória partilhada oferece grandes vantagen
 
 ## Nota
 Deve utilizar os comandos ``` ipcs ``` e ``` ipcrm ``` para remover blocos não libertados devido ao funcionamento incorreto dos programas.
+
+## Apresentação dos semáforos
+
+Semáforos são mecanismos de sincronização fornecidos pelo sistema operativo para controlar o acesso concorrente a recursos partilhados, como uma região de memória partilhada entre processos. Em POSIX/UNIX, os semáforos permitem que vários processos cooperem definindo “regras de passagem”: antes de aceder ao recurso, o processo pede autorização ao semáforo; quando termina, devolve essa autorização. Assim, evita-se que dois processos modifiquem, ao mesmo tempo, dados que devem ser tratados de forma consistente.
+
+No contexto da memória partilhada, os semáforos aparecem como a “peça que falta”: a memória partilhada fornece o local comum para os dados, mas não impõe qualquer ordem de acesso; os semáforos fornecem essa disciplina, garantindo exclusão mútua ou coordenação entre produtores e consumidores.
+
+---
+
+## Descrição conceptual
+
+Um semáforo pode ser visto, de forma abstracta, como um contador inteiro protegido pelo sistema operativo:
+
+* Quando um processo faz uma operação de **espera** (clássico `P`, em POSIX `sem_wait`), o semáforo é decrementado.
+
+  * Se o valor ainda for não negativo, o processo continua.
+  * Se o valor se tornaria negativo, o processo é bloqueado até outro processo “libertar” o semáforo.
+
+* Quando um processo faz uma operação de **sinal** (clássico `V`, em POSIX `sem_post`), o semáforo é incrementado.
+
+  * Se houver processos bloqueados à espera desse semáforo, o sistema operativo acorda um deles.
+
+Com esta mecânica simples, há dois usos típicos na comunicação via memória partilhada:
+
+1. **Exclusão mútua (mutex)**
+   O semáforo é inicializado com o valor 1.
+
+   * Só um processo de cada vez consegue “entrar” na secção crítica (por exemplo, ler e escrever numa estrutura em memória partilhada).
+   * Quando um processo está dentro, os outros ficam bloqueados à espera do semáforo voltar a 1.
+
+2. **Sincronização de fluxo (produtor–consumidor)**
+   Dois semáforos gerem a disponibilidade de espaço e de dados:
+
+   * Um semáforo conta quantas unidades de dados estão disponíveis para ler.
+   * Outro conta quantos espaços livres há para escrever.
+     O produtor espera por espaço livre antes de escrever e sinaliza dados disponíveis quando termina; o consumidor espera por dados disponíveis antes de ler e sinaliza espaço livre quando termina.
+
+Do ponto de vista conceptual, os semáforos funcionam como sinais de trânsito ou contadores de lugares num parque de estacionamento: regulam a entrada e saída para que o recurso nunca seja usado em excesso e não ocorram colisões.
+
+---
+
+## Descrição da implementação com memória partilhada
+
+Em POSIX/UNIX, a combinação “memória partilhada + semáforos” faz-se com duas famílias de primitivas POSIX:
+
+* Para **memória partilhada**: `shm_open`, `ftruncate`, `mmap`, `munmap`, `shm_unlink` (mais `close`), nas bibliotecas associadas a `<sys/mman.h>`, `<sys/stat.h>`, `<fcntl.h>`, `<unistd.h>`.
+* Para **semáforos POSIX**: funções declaradas em `<semaphore.h>`.
+
+Na prática, segue-se o seguinte caminho:
+
+**Semáforos nomeados**
+   Os semáforos são “objetos” do sistema com um nome, tal como a memória partilhada:
+
+   * São criados/abertos com uma função que recebe um nome e flags semelhantes a `O_CREAT` e permissões.
+   * Vários processos, ao conhecerem esse nome, conseguem abrir o mesmo semáforo.
+   * As operações de espera e sinal (bloquear/libertar) são realizadas com funções padrão (`sem_wait`, `sem_post`).
+   * No fim, o semáforo é fechado e o seu nome pode ser removido do sistema, tal como acontece com `shm_unlink` na memória.
+
+   Neste modelo, a memória partilhada é usada apenas para os dados, enquanto a coordenação é feita por semáforos que vivem “fora” dessa memória, mas que são igualmente partilhados via nome.
+
+O padrão de utilização é semelhante:
+
+* Antes de aceder à estrutura em memória partilhada, o processo faz uma operação de espera no semáforo de exclusão mútua, garantindo que mais ninguém mexe nos mesmos campos ao mesmo tempo.
+* Se houver regras de fluxo produtor–consumidor, o produtor e o consumidor ainda coordenam, com outros semáforos, a ordem em que se escreve e se lê.
+* Quando termina a operação na memória partilhada, o processo emite um sinal, libertando o semáforo para que outro processo possa continuar.
+
+Esta combinação transforma a memória partilhada num mecanismo de comunicação seguro e previsível: a memória fornece o espaço físico para os dados, e os semáforos impõem a ordem de acesso e evitam condições de corrida.
+
+## Ideia dos semáforos do System V.
+
+---
+
+### 1. Semáforos System V: ideia
+
+Os semáforos System V são um dos mecanismos clássicos de IPC em UNIX.
+
+* Vivem num **conjunto de semáforos** (semaphore set), identificado por um `int semid`.
+* Cada conjunto possui um ou mais semáforos individuais (indexados por 0, 1, 2, …).
+* Usam-se três chamadas principais:
+
+1. `semget` – cria ou obtém um conjunto de semáforos.
+2. `semctl` – controla/consulta/inicializa um semáforo.
+3. `semop` – executa operações atómicas tipo P/V (espera/sinal) sobre um ou vários semáforos.
+
+#### Modelo mental
+
+* Valor inicial do semáforo:
+
+  * `1` → exclusão mútua (mutex): só um processo entra na secção crítica de cada vez.
+  * `0` → sincronização (esperar que algo aconteça).
+
+* Operações:
+
+  * **P (wait)**: `semop` com `sem_op = -1`.
+
+    * Se o valor do semáforo for > 0, decrementa e segue.
+    * Se for 0, o processo bloqueia até alguém fazer V.
+  * **V (signal)**: `semop` com `sem_op = +1`.
+
+    * Incrementa o semáforo e, se houver alguém bloqueado, desperta um processo.
+
+---
+
+### Exemplo simples: contador em memória partilhada
+
+Exemplo clássico:
+
+* Um segmento de **memória partilhada System V** com um inteiro.
+* Um **semáforo System V** para garantir exclusão mútua.
+* O processo pai faz `fork()`, pai e filho incrementam o contador várias vezes.
+* O semáforo evita que se pisem os pés.
+
+#### Ideia do fluxo
+
+1. Criar segmento de memória partilhada (`shmget`) e obter um ponteiro (`shmat`).
+2. Criar conjunto de semáforos (`semget`) com 1 semáforo.
+3. Inicializar esse semáforo com valor 1 (`semctl` + `SETVAL`).
+4. `fork()`:
+
+   * Pai e filho entram num ciclo de incrementos.
+   * Cada incremento:
+
+     1. `P` (espera) → entra em secção crítica.
+     2. Lê `*shared`, incrementa, volta a escrever.
+     3. `V` (sinal) → sai da secção crítica.
+5. Pai espera pelo filho, imprime valor final.
+6. Limpa recursos (desanexa e remove shm, destrói semáforo).
+
+#### Código de exemplo (C)
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/wait.h>
+
+/* union semun não é declarada pelo padrão em alguns sistemas */
+union semun {
+    int              val;
+    struct semid_ds *buf;
+    unsigned short  *array;
+};
+
+/* Operação P (wait) */
+void sem_P(int semid) {
+    struct sembuf op;
+    op.sem_num = 0;   // índice do semáforo no conjunto
+    op.sem_op  = -1;  // P: tenta decrementar
+    op.sem_flg = 0;   // bloqueia se não puder
+
+    if (semop(semid, &op, 1) == -1) {
+        perror("semop P");
+        exit(1);
+    }
+}
+
+/* Operação V (signal) */
+void sem_V(int semid) {
+    struct sembuf op;
+    op.sem_num = 0;
+    op.sem_op  = +1;  // V: incrementa
+    op.sem_flg = 0;
+
+    if (semop(semid, &op, 1) == -1) {
+        perror("semop V");
+        exit(1);
+    }
+}
+
+int main(void) {
+    key_t key_shm  = 0x1234;  // chave para memória partilhada
+    key_t key_sem  = 0x5678;  // chave para semáforo
+    int shmid, semid;
+    int *shared;
+    union semun arg;
+
+    /* 1. Criar memória partilhada com 1 inteiro */
+    shmid = shmget(key_shm, sizeof(int), IPC_CREAT | 0666);
+    if (shmid == -1) {
+        perror("shmget");
+        exit(1);
+    }
+
+    shared = (int *) shmat(shmid, NULL, 0);
+    if (shared == (void *) -1) {
+        perror("shmat");
+        exit(1);
+    }
+
+    *shared = 0;  // contador inicial
+
+    /* 2. Criar conjunto de 1 semáforo */
+    semid = semget(key_sem, 1, IPC_CREAT | 0666);
+    if (semid == -1) {
+        perror("semget");
+        exit(1);
+    }
+
+    /* 3. Inicializar semáforo a 1 (mutex) */
+    arg.val = 1;
+    if (semctl(semid, 0, SETVAL, arg) == -1) {
+        perror("semctl SETVAL");
+        exit(1);
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror("fork");
+        exit(1);
+    }
+
+    int i;
+    if (pid == 0) {
+        /* Processo filho */
+        for (i = 0; i < 10; i++) {
+            sem_P(semid);          // entra na secção crítica
+            int tmp = *shared;
+            tmp++;
+            usleep(10000);         // simular trabalho
+            *shared = tmp;
+            sem_V(semid);          // sai da secção crítica
+        }
+        shmdt(shared);
+        exit(0);
+    } else {
+        /* Processo pai */
+        for (i = 0; i < 10; i++) {
+            sem_P(semid);
+            int tmp = *shared;
+            tmp++;
+            usleep(10000);
+            *shared = tmp;
+            sem_V(semid);
+        }
+
+        /* Esperar pelo filho */
+        wait(NULL);
+
+        printf("Valor final do contador: %d\n", *shared);
+
+        /* Limpeza */
+        shmdt(shared);
+        shmctl(shmid, IPC_RMID, NULL);      // remove segmento de memória
+        semctl(semid, 0, IPC_RMID, arg);    // remove conjunto de semáforos
+    }
+
+    return 0;
+}
+```
+
+#### Como explicar isto aos alunos
+
+* **Mostra o problema**: sem semáforo, pai e filho poderiam ler o mesmo valor e escrever ambos `+1`, “perdendo” incrementos.
+* **Mostra a solução**:
+
+  * Antes de mexer no contador partilhado → `P(sem)` → garantia de exclusão mútua.
+  * Depois de mexer → `V(sem)` → outro processo pode entrar.
+* **Sublinha o papel do kernel**:
+
+  * `semop` é atómico: o kernel garante que o teste e o decremento/incremento do semáforo acontecem como uma só operação.
+* **Mensagem final**: System V semáforos são mais verbosos que os POSIX, mas continuam muito usados em contextos legados; o padrão `semget` + `semctl` + `semop` é sempre o mesmo.
