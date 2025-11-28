@@ -139,9 +139,7 @@ Para enviar sinais, os processos têm de conhecer os **PIDs** envolvidos:
 
 ### 2.2. Instalar handlers de sinal
 
-Para reagir a sinais, é necessário instalar manipuladores (handlers) com `signal()` ou `sigaction()`. Estes handlers definem o comportamento do processo ao receber determinado sinal.
-
-`sigaction()` é a abordagem recomendada por ser mais robusta.
+Para reagir a sinais, é necessário instalar manipuladores (handlers) com `signal()`. Estes handlers definem o comportamento do processo ao receberem determinado sinal.
 
 ### 2.3. Máscaras de sinais e sincronização
 
